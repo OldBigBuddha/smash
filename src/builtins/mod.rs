@@ -4,6 +4,7 @@ use crate::shell::Shell;
 use thiserror::Error;
 
 mod cd;
+mod eval;
 mod exit;
 
 pub trait BuiltinCommand {
@@ -25,6 +26,7 @@ pub fn builtin_command(name: &str) -> Option<Box<dyn BuiltinCommand>> {
     match name {
         "exit" => Some(Box::new(exit::Exit)),
         "cd" => Some(Box::new(cd::Cd)),
+        "eval" => Some(Box::new(eval::Eval)),
         _ => None,
     }
 }

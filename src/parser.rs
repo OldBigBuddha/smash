@@ -249,6 +249,19 @@ fn visit_escaped_word(pair: Pair<Rule>, literal_chars: bool) -> Word {
             Rule::literal_span if !literal_chars => {
                 spans.push(Span::Literal(visit_escape_sequences(span, None)));
             }
+            Rule::double_quoted_span => {
+                for span_in_quote in span.into_inner() {
+                    match span_in_quote.as_rule() {
+                        Rule::literal_in_double_quoted_span => {
+                            spans.push(Span::Literal(visit_escape_sequences(
+                                span_in_quote,
+                                Some("\"`$"),
+                            )));
+                        }
+                        rule => unreachable!("{:?}", rule),
+                    }
+                }
+            }
             _ => {
                 debug!(?span);
                 unimplemented!("span {:?}", span.as_rule());
