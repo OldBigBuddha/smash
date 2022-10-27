@@ -22,6 +22,7 @@ pub struct Ast {
 pub struct Term {
     pub code: String,
     pub pipelines: Vec<Pipeline>,
+    pub background: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -87,6 +88,7 @@ fn visit_compound_list(pair: Pair<Rule>) -> Vec<Term> {
     let mut terms = Vec::new();
     let mut inner = pair.into_inner();
     if let Some(and_or_list) = inner.next() {
+        let mut background = false;
         let mut rest = None;
         while let Some(sep_or_rest) = inner.next() {
             debug!(?sep_or_rest);
@@ -95,14 +97,30 @@ fn visit_compound_list(pair: Pair<Rule>) -> Vec<Term> {
                     rest = Some(sep_or_rest);
                     break;
                 }
-                _ => (),
+                _ => {
+                    let sep = sep_or_rest.into_inner().next().unwrap();
+                    match sep.as_rule() {
+                        Rule::background => {
+                            background = true;
+                        }
+                        Rule::newline => {
+                            // TODO: handle heredocs
+                        }
+                        Rule::seq_sep => (),
+                        _ => (),
+                    }
+                }
             }
         }
 
         if and_or_list.as_rule() == Rule::and_or_list {
             let code = and_or_list.as_str().to_owned().trim().to_owned();
             let pipelines = visit_and_or_list(and_or_list, RunIf::Always);
-            terms.push(Term { code, pipelines });
+            terms.push(Term {
+                code,
+                pipelines,
+                background,
+            });
         }
 
         if let Some(rest) = rest {
@@ -265,6 +283,7 @@ mod test {
                             argv: literal_word_vec!["ls", "-G", "/tmp"]
                         }],
                     }],
+                    background: false
                 }],
             })
         );

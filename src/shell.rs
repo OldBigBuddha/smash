@@ -1,8 +1,10 @@
 use crate::eval::eval;
 use crate::parser;
+use crate::path::PathTable;
 use crate::process::{ExitStatus, Job, JobId, ProcessState};
+use crate::variable::Value;
 
-use nix::sys::termios::Termios;
+use nix::sys::termios::{tcgetattr, Termios};
 use nix::unistd::{getpid, Pid};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -11,6 +13,7 @@ use tracing::debug;
 pub struct Shell {
     last_status: i32,
     pub interactive: bool,
+    path_table: PathTable,
     pub shell_termios: Option<Termios>,
     states: HashMap<Pid, ProcessState>,
     pub shell_pgid: Pid,
@@ -24,6 +27,7 @@ impl Shell {
         Self {
             last_status: 0,
             interactive: false,
+            path_table: PathTable::new(),
             shell_termios: None,
             states: HashMap::new(),
             shell_pgid: getpid(),
@@ -35,6 +39,26 @@ impl Shell {
 
     pub fn set_interactive(&mut self, interactive: bool) {
         self.interactive = interactive;
+        self.shell_termios = if interactive {
+            Some(tcgetattr(0 /* stdin */).expect("failed to tcgetattr"))
+        } else {
+            None
+        };
+    }
+
+    pub fn set(&mut self, key: &str, value: Value, is_local: bool) {
+        // TODO: support local variables
+
+        if !is_local && key == "PATH" {
+            if let Value::String(ref path) = value {
+                self.path_table.scan(path);
+            }
+        }
+    }
+
+    #[inline]
+    pub fn interactive(&self) -> bool {
+        self.interactive
     }
 
     pub fn get_process_state(&self, pid: Pid) -> Option<&ProcessState> {
@@ -47,6 +71,10 @@ impl Shell {
 
     pub fn set_last_status(&mut self, status: i32) {
         self.last_status = status;
+    }
+
+    pub fn path_table(&self) -> &PathTable {
+        &self.path_table
     }
 
     pub fn run_script(&mut self, script: &str) -> ExitStatus {

@@ -3,6 +3,7 @@ use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Attribute, Print, SetAttribute};
 use crossterm::terminal::{self, disable_raw_mode, enable_raw_mode, Clear, ClearType};
 use crossterm::{execute, queue};
+use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::cmp::min;
 use std::io::Write;
 use std::time::Duration;
@@ -334,6 +335,15 @@ impl SmashState {
     pub fn run(&mut self) {
         enable_raw_mode().ok();
         self.render_prompt();
+
+        let action = SigAction::new(SigHandler::SigIgn, SaFlags::empty(), SigSet::empty());
+        unsafe {
+            sigaction(Signal::SIGINT, &action).expect("failed to sigaction");
+            sigaction(Signal::SIGQUIT, &action).expect("failed to sigaction");
+            sigaction(Signal::SIGTSTP, &action).expect("failed to sigaction");
+            sigaction(Signal::SIGTTIN, &action).expect("failed to sigaction");
+            sigaction(Signal::SIGTTOU, &action).expect("failed to sigaction");
+        }
 
         debug!("start");
         loop {

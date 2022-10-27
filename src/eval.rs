@@ -2,7 +2,8 @@ use crate::builtins::BuiltinCommandError;
 use crate::expand::expand_words;
 use crate::parser::{self, Ast, RunIf, Term};
 use crate::process::{
-    run_in_foreground, run_internal_command, wait_for_job, ExitStatus, ProcessState,
+    run_external_command, run_in_foreground, run_internal_command, wait_for_job, Context,
+    ExitStatus, ProcessState,
 };
 use crate::shell::Shell;
 
@@ -25,14 +26,19 @@ pub fn run_terms(shell: &mut Shell, terms: &[Term]) -> ExitStatus {
                 _ => continue,
             }
 
-            last_status = run_pipeline(shell, &term.code, pipeline);
+            last_status = run_pipeline(shell, &term.code, pipeline, term.background);
         }
     }
 
     last_status
 }
 
-fn run_pipeline(shell: &mut Shell, code: &str, pipeline: &parser::Pipeline) -> ExitStatus {
+fn run_pipeline(
+    shell: &mut Shell,
+    code: &str,
+    pipeline: &parser::Pipeline,
+    background: bool,
+) -> ExitStatus {
     // Invoke commands in a pipeline.
     let mut last_result = None;
     let mut iter = pipeline.commands.iter().peekable();
@@ -49,7 +55,15 @@ fn run_pipeline(shell: &mut Shell, code: &str, pipeline: &parser::Pipeline) -> E
             None
         };
 
-        let result = run_command(shell, command);
+        let result = run_command(
+            shell,
+            command,
+            &Context {
+                pgid,
+                background,
+                interactive: shell.interactive(),
+            },
+        );
 
         if let Some((_, pipe_in)) = pipes {
             // `pipe_in` is used by a child process and is no longer needed.
@@ -111,16 +125,24 @@ fn run_pipeline(shell: &mut Shell, code: &str, pipeline: &parser::Pipeline) -> E
     }
 }
 
-fn run_command(shell: &mut Shell, command: &parser::Command) -> anyhow::Result<ExitStatus> {
+fn run_command(
+    shell: &mut Shell,
+    command: &parser::Command,
+    ctx: &Context,
+) -> anyhow::Result<ExitStatus> {
     debug!("run_command: {:?}", command);
     let result = match command {
-        parser::Command::SimpleCommand { argv } => run_simple_command(shell, argv)?,
+        parser::Command::SimpleCommand { argv } => run_simple_command(ctx, shell, argv)?,
     };
 
     Ok(result)
 }
 
-fn run_simple_command(shell: &mut Shell, argv: &[parser::Word]) -> anyhow::Result<ExitStatus> {
+fn run_simple_command(
+    ctx: &Context,
+    shell: &mut Shell,
+    argv: &[parser::Word],
+) -> anyhow::Result<ExitStatus> {
     debug!("run_simple_command");
     let argv = expand_words(shell, argv)?;
     if argv.is_empty() {
@@ -141,5 +163,5 @@ fn run_simple_command(shell: &mut Shell, argv: &[parser::Word]) -> anyhow::Resul
 
     debug!("argv: {:?}", argv);
     // TODO: External commands
-    Ok(ExitStatus::ExitedWith(1))
+    run_external_command(ctx, shell, argv)
 }
