@@ -9,5 +9,8 @@ tracing = "0.1.34"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 pest = "2.4"
 pest_derive = "2.4"
+nix = "0"
+anyhow = "1.0"
+thiserror = "1.0"
 
 [dev-dependencies]
