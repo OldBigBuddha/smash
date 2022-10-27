@@ -8,7 +8,10 @@ use std::io::Write;
 use std::time::Duration;
 use tracing::debug;
 
+use crate::shell::Shell;
+
 pub struct SmashState {
+    shell: Shell,
     columns: usize,
     lines: usize,
     prompt_len: usize,
@@ -45,6 +48,10 @@ impl UserInput {
 
     pub fn nth(&self, index: usize) -> Option<char> {
         self.input.chars().nth(index)
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.input.as_str()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -162,8 +169,9 @@ impl Drop for SmashState {
 }
 
 impl SmashState {
-    pub fn new() -> Self {
+    pub fn new(shell: Shell) -> Self {
         Self {
+            shell,
             columns: 0,
             lines: 0,
             prompt_len: 0,
@@ -171,6 +179,22 @@ impl SmashState {
             clear_above: 0,
             clear_below: 0,
         }
+    }
+
+    fn run_command(&mut self) {
+        self.print_user_input();
+
+        execute!(std::io::stdout(), Print("\r\n")).ok();
+        disable_raw_mode().ok();
+        self.shell.run_script(self.input.as_str());
+        enable_raw_mode().ok();
+
+        self.input.clear();
+        self.clear_above = 0;
+        self.clear_below = 0;
+
+        self.render_prompt();
+        self.print_user_input();
     }
 
     pub fn render_prompt(&mut self) {
@@ -249,6 +273,7 @@ impl SmashState {
     }
 
     pub fn handle_key_event(&mut self, ev: &KeyEvent) {
+        let mut needs_redraw = true;
         match (ev.code, ev.modifiers) {
             // cursor
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
@@ -287,9 +312,8 @@ impl SmashState {
                 self.input.backspace();
             }
             (KeyCode::Enter, KeyModifiers::NONE) => {
-                execute!(std::io::stdout(), Print("\r\n")).ok();
-                self.input.clear();
-                self.render_prompt();
+                self.run_command();
+                needs_redraw = false;
             }
             (KeyCode::Esc, KeyModifiers::NONE) => {
                 disable_raw_mode().ok();
@@ -302,7 +326,9 @@ impl SmashState {
             _ => (),
         }
 
-        self.print_user_input();
+        if needs_redraw {
+            self.print_user_input();
+        }
     }
 
     pub fn run(&mut self) {
@@ -344,10 +370,10 @@ impl SmashState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crossterm::event::KeyModifiers;
 
     fn create_smash_state() -> SmashState {
-        SmashState::new()
+        let shell = Shell::new();
+        SmashState::new(shell)
     }
 
     macro_rules! key_event {
