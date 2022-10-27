@@ -12,5 +12,6 @@ pest_derive = "2.4"
 nix = "0"
 anyhow = "1.0"
 thiserror = "1.0"
+dirs = "1"
 
 [dev-dependencies]

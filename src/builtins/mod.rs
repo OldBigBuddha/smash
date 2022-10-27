@@ -3,6 +3,7 @@ use crate::shell::Shell;
 
 use thiserror::Error;
 
+mod cd;
 mod exit;
 
 pub trait BuiltinCommand {
@@ -23,6 +24,7 @@ pub enum BuiltinCommandError {
 pub fn builtin_command(name: &str) -> Option<Box<dyn BuiltinCommand>> {
     match name {
         "exit" => Some(Box::new(exit::Exit)),
+        "cd" => Some(Box::new(cd::Cd)),
         _ => None,
     }
 }

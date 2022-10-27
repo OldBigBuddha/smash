@@ -20,6 +20,7 @@ pub struct Shell {
     jobs: HashMap<JobId, Rc<Job>>,
     pub last_fore_job: Option<Rc<Job>>,
     pid_job_mapping: HashMap<Pid, Rc<Job>>,
+    cd_stack: Vec<String>,
 }
 
 impl Shell {
@@ -34,6 +35,7 @@ impl Shell {
             jobs: HashMap::new(),
             last_fore_job: None,
             pid_job_mapping: HashMap::new(),
+            cd_stack: Vec::new(),
         }
     }
 
@@ -54,6 +56,14 @@ impl Shell {
                 self.path_table.scan(path);
             }
         }
+    }
+
+    pub fn pushd(&mut self, path: String) {
+        self.cd_stack.push(path);
+    }
+
+    pub fn popd(&mut self) -> Option<String> {
+        self.cd_stack.pop()
     }
 
     #[inline]

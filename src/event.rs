@@ -221,6 +221,20 @@ impl SmashState {
         .ok();
 
         let (mut prompt_str, mut prompt_len) = (String::new(), 0);
+        if let Ok(current_dir) = std::env::current_dir() {
+            let mut path = current_dir.to_str().unwrap().to_string();
+
+            // "/Users/username/path/to" -> "~/path/to"
+            if let Some(home_dir) = dirs::home_dir() {
+                let home_dir = home_dir.to_str().unwrap();
+                if path.starts_with(&home_dir) {
+                    path = path.replace(home_dir, "~");
+                }
+            }
+
+            prompt_str.push_str(&path);
+        }
+
         prompt_str.push_str(" $ ");
         queue!(stdout, Print(prompt_str.replace('\n', "\r\n"))).ok();
         prompt_len += prompt_str.len();
